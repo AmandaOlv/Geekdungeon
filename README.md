@@ -4,6 +4,16 @@
 
 ---
 
+## 🤝 Contribuintes
+
+Este projeto é uma iniciativa de extensão da **Descomplica**, desenvolvido por:
+
+- **Amanda Pereira de Oliveira**
+- **Italo Lima Da Silva**
+- **Saulo Lohan Soares**
+
+---
+
 ## 📖 Índice
 
 1. [O que é esse projeto?](#-o-que-é-esse-projeto)
@@ -408,11 +418,11 @@ A camada de infraestrutura contém os **detalhes técnicos**: como conectar ao b
 class DatabaseConfig:
     def __init__(self):
         connection_string = (
-            "DRIVER={ODBC Driver 18 for SQL Server};"        # Driver ODBC instalado
+            "DRIVER={ODBC Driver 18 for SQL Server};"       # Driver ODBC instalado
             "SERVER=[REDACTED_HOST];"   # Endereço do servidor
             "DATABASE=geekdungeon-produtos;"                 # Nome do banco
-            "UID=AQUI É O USUARIO;"                          # Usuário
-            "PWD=AQUI É A SENHA;"                            # Senha
+            "UID=[REDACTED_USER];"                      # Usuário
+            "PWD=[REDACTED];"                                # Senha
             "TrustServerCertificate=yes;"                    # Aceitar certificado SSL
         )
 
