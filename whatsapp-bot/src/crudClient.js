@@ -40,6 +40,9 @@ const updateProduto = (id, data) =>
 const deleteProduto = (id) =>
   api.delete(`/produtos/${id}`).then((r) => r.status);
 
+const ajustarEstoque = (id, delta) =>
+  api.post(`/produtos/${id}/estoque`, { delta }).then((r) => r.data);
+
 module.exports = {
   listCategorias,
   getCategoriaById,
@@ -51,4 +54,5 @@ module.exports = {
   createProduto,
   updateProduto,
   deleteProduto,
+  ajustarEstoque,
 };

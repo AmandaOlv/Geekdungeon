@@ -2,6 +2,7 @@ const express = require('express');
 const { WEBHOOK_PORT } = require('./config');
 const { processMessage } = require('./menuHandler');
 const { sendText } = require('./evolutionApi');
+const { isAllowedPhone, isGroupOrBroadcast, isPrivateUserChat } = require('./allowlist');
 
 const app = express();
 app.use(express.json());
@@ -48,12 +49,21 @@ app.post('/webhook', async (req, res) => {
   // Ignora mensagens enviadas pelo próprio bot
   if (key.fromMe) return;
 
-  // Ignora mensagens de grupos (remoteJid termina com @g.us)
   const remoteJid = key.remoteJid || '';
-  if (remoteJid.endsWith('@g.us')) return;
+  if (isGroupOrBroadcast(remoteJid)) {
+    console.log(`🚫 Grupo/broadcast ignorado: ${remoteJid}`);
+    return;
+  }
+  if (!isPrivateUserChat(remoteJid)) {
+    console.log(`🚫 Chat não privado ignorado: ${remoteJid}`);
+    return;
+  }
 
   const phone = extractPhone(remoteJid);
-  if (!phone) return;
+  if (!phone || !isAllowedPhone(phone)) {
+    console.log(`🚫 Número não autorizado ignorado: ${phone || remoteJid}`);
+    return;
+  }
 
   const text = extractText(data.message);
   if (!text || !text.trim()) return;

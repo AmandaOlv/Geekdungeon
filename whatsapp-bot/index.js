@@ -4,22 +4,47 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { processMessage } = require('./src/menuHandler');
+const {
+  ALLOWED_NUMBERS,
+  isAllowedPhone,
+  isGroupOrBroadcast,
+  isPrivateUserChat,
+} = require('./src/allowlist');
 
-// Números autorizados a interagir com o bot (apenas o número, sem @c.us)
-const ALLOWED_NUMBERS = ['558800000000','558800000001'];//numeros mockados
+if (!ALLOWED_NUMBERS.size) {
+  console.error('❌ ALLOWED_NUMBERS está vazio. Ninguém será atendido. Configure o .env');
+}
+
+const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: path.join(__dirname, '.wwebjs_auth') }),
   puppeteer: {
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    headless: false,
+    executablePath: chromePath,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-extensions',
+      '--no-first-run',
+      '--disable-features=site-per-process',
+    ],
   },
 });
 
-// ── QR Code ───────────────────────────────────────────────────────────────────
+async function replyIfAllowed(msg, text) {
+  const from = msg.from || '';
+  if (msg.fromMe) return;
+  if (isGroupOrBroadcast(from, msg)) return;
+  if (!isPrivateUserChat(from)) return;
+  const phone = from.replace(/@.*$/, '');
+  if (!isAllowedPhone(phone)) return;
+  await msg.reply(text);
+}
 
 client.on('qr', (qr) => {
-  process.stdout.write('\x1Bc'); // limpa tela
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('  🎮 GeekDungeon WhatsApp Bot');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -29,19 +54,15 @@ client.on('qr', (qr) => {
   console.log('  (Se expirar, um novo QR será gerado automaticamente)\n');
 });
 
-// ── Pronto ─────────────────────────────────────────────────────────────────────
-
 client.on('ready', () => {
-  process.stdout.write('\x1Bc');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('  🎮 GeekDungeon WhatsApp Bot');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
   console.log('✅ WhatsApp conectado com sucesso!');
-  console.log('🤖 Bot pronto! Envie uma mensagem no WhatsApp para começar.');
+  console.log(`🔐 Allowlist ativa: só conversas privadas com os números configurados.`);
+  console.log('   Grupos, status e números fora da lista são ignorados (sem resposta).');
   console.log('   Pressione Ctrl+C para encerrar.\n');
 });
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
 
 client.on('authenticated', () => {
   console.log('🔐 Autenticado! Carregando sessão...');
@@ -57,34 +78,26 @@ client.on('disconnected', (reason) => {
   client.initialize();
 });
 
-// ── Mensagens ────────────────────────────────────────────────────────────────
-
 client.on('message', async (msg) => {
-  // Ignora mensagens do próprio bot
   if (msg.fromMe) return;
 
-  // Ignora grupos (@g.us), broadcasts (@broadcast) e status (@status.broadcast)
   const from = msg.from || '';
-  if (
-    msg.isGroupMsg ||
-    from.endsWith('@g.us') ||
-    from.endsWith('@broadcast') ||
-    from === 'status@broadcast'
-  ) return;
-
-  // Aceita apenas mensagens privadas (@c.us)
-  if (!from.endsWith('@c.us')) return;
+  if (isGroupOrBroadcast(from, msg)) {
+    console.log(`🚫 Grupo/broadcast ignorado: ${from}`);
+    return;
+  }
+  if (!isPrivateUserChat(from)) {
+    console.log(`🚫 Chat não privado ignorado: ${from}`);
+    return;
+  }
 
   const phone = from.replace(/@.*$/, '');
-
-  // Verifica se o número está na lista de autorizados
-  if (!ALLOWED_NUMBERS.includes(phone)) {
+  if (!isAllowedPhone(phone)) {
     console.log(`🚫 Número não autorizado ignorado: ${phone}`);
     return;
   }
 
   const text = msg.body?.trim();
-
   if (!text) return;
 
   console.log(`📩 [${phone}]: ${text}`);
@@ -92,25 +105,29 @@ client.on('message', async (msg) => {
   try {
     const reply = await processMessage(phone, text);
     if (reply) {
-      await msg.reply(reply);
+      await replyIfAllowed(msg, reply);
       console.log(`📤 [${phone}]: ${reply.substring(0, 60).replace(/\n/g, ' ')}...`);
     }
   } catch (err) {
     console.error(`Erro ao processar mensagem de ${phone}:`, err.message);
     try {
-      await msg.reply('❌ Ocorreu um erro interno. Tente novamente ou envie *menu*.');
+      await replyIfAllowed(msg, '❌ Ocorreu um erro interno. Tente novamente ou envie *menu*.');
     } catch {
       // Ignora
     }
   }
 });
 
-// ── Inicializa ────────────────────────────────────────────────────────────────
-
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log('  🎮 GeekDungeon WhatsApp Bot — Iniciando...');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-console.log('⏳ Abrindo conexão com WhatsApp Web (aguarde)...\n');
+if (ALLOWED_NUMBERS.size) {
+  console.log('🔐 Bot responde SOMENTE a estes números (privados):');
+  console.log('   +55 88 9311-5914');
+  console.log('   +55 88 99695-6647');
+  console.log('   Grupos e qualquer outro contato são ignorados.\n');
+}
+console.log('⏳ Abrindo conexão com WhatsApp Web (aguarde o QR Code)...\n');
 
 client.initialize().catch((err) => {
   console.error('❌ Erro fatal ao inicializar:', err.message);

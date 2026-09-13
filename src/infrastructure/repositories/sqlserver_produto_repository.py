@@ -3,7 +3,7 @@ Infrastructure Layer - SQL Server Produto Repository
 Implementação do repositório usando SQL Server
 """
 from typing import Optional, List
-from sqlalchemy import select
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from datetime import datetime
 from decimal import Decimal
@@ -38,7 +38,7 @@ class SqlServerProdutoRepository(IProdutoRepository):
         model = ProdutoModel(
             Nome=produto.nome,
             Descricao=produto.descricao,
-            PrecoVenda=float(produto.preco_venda),
+            PrecoVenda=Decimal(str(produto.preco_venda)),
             QuantidadeEstoque=produto.quantidade_estoque,
             CategoriaId=produto.categoria_id,
             DataCriacao=datetime.now(),
@@ -67,7 +67,7 @@ class SqlServerProdutoRepository(IProdutoRepository):
         if not include_deleted:
             query = query.filter(ProdutoModel.DataExclusao.is_(None))
         
-        models = query.all()
+        models = query.order_by(ProdutoModel.Id).all()
         
         return [self._to_entity(model) for model in models]
     
@@ -78,7 +78,7 @@ class SqlServerProdutoRepository(IProdutoRepository):
         if not include_deleted:
             query = query.filter(ProdutoModel.DataExclusao.is_(None))
         
-        models = query.all()
+        models = query.order_by(ProdutoModel.Id).all()
         
         return [self._to_entity(model) for model in models]
     
@@ -93,7 +93,7 @@ class SqlServerProdutoRepository(IProdutoRepository):
         
         model.Nome = produto.nome
         model.Descricao = produto.descricao
-        model.PrecoVenda = float(produto.preco_venda)
+        model.PrecoVenda = Decimal(str(produto.preco_venda))
         model.QuantidadeEstoque = produto.quantidade_estoque
         model.CategoriaId = produto.categoria_id
         model.DataAtualizacao = datetime.now()
@@ -106,7 +106,8 @@ class SqlServerProdutoRepository(IProdutoRepository):
     def delete(self, produto_id: int) -> bool:
         """Soft delete de um produto"""
         model = self._session.query(ProdutoModel).filter(
-            ProdutoModel.Id == produto_id
+            ProdutoModel.Id == produto_id,
+            ProdutoModel.DataExclusao.is_(None),
         ).first()
         
         if not model:
@@ -118,10 +119,11 @@ class SqlServerProdutoRepository(IProdutoRepository):
         return True
     
     def find_by_nome(self, nome: str) -> List[Produto]:
-        """Busca produtos por nome (parcial)"""
+        """Busca produtos por nome (parcial), escapando curingas do LIKE"""
+        termo = (nome or "").strip().replace("[", "[[]").replace("%", "[%]").replace("_", "[_]")
         models = self._session.query(ProdutoModel).filter(
-            ProdutoModel.Nome.like(f"%{nome}%"),
+            func.lower(ProdutoModel.Nome).like(f"%{termo.lower()}%"),
             ProdutoModel.DataExclusao.is_(None)
-        ).all()
+        ).order_by(ProdutoModel.Id).all()
         
         return [self._to_entity(model) for model in models]

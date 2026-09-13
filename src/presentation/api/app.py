@@ -26,8 +26,8 @@ def create_app() -> FastAPI:
     # Configuração de CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Em produção, especifique os domínios permitidos
-        allow_credentials=True,
+        allow_origins=["*"],
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -36,18 +36,27 @@ def create_app() -> FastAPI:
     app.include_router(categoria_router)
     app.include_router(produto_router)
     
-    @app.get("/", tags=["health"])
-    async def health_check():
-        """Health check endpoint"""
+    def health_payload():
         return {
             "status": "healthy",
             "message": "GeekDungeon Chatbot API está rodando!",
             "endpoints": {
                 "categorias": "/categorias",
                 "produtos": "/produtos",
-                "docs": "/docs"
-            }
+                "docs": "/docs",
+                "health": "/health",
+            },
         }
+
+    @app.get("/", tags=["health"])
+    async def root():
+        """Health check endpoint"""
+        return health_payload()
+
+    @app.get("/health", tags=["health"])
+    async def health_check():
+        """Health check usado pelo painel web"""
+        return health_payload()
     
     return app
 

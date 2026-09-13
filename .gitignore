@@ -36,3 +36,14 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+# Node / frontend
+node_modules/
+web/dist/
+.firebase/
+firebase-debug.log
+*-debug.log
+
+# WhatsApp session
+.wwebjs_auth/
+.wwebjs_cache/

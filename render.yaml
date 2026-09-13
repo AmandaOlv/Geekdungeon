@@ -1,0 +1,21 @@
+# Blueprint do Render: New → Blueprint → este repositório.
+# Plano free (HTTPS). O serviço dorme após ~15 min sem tráfego.
+services:
+  - type: web
+    name: geekdungeon-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DEBUG
+        value: "false"
+      - key: DB_DRIVER
+        value: ODBC Driver 18 for SQL Server
+      - key: DB_SERVER
+        value: geekdungeon-sandbox.mssql.somee.com
+      - key: DB_NAME
+        value: geekdungeon-sandbox
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false

@@ -13,7 +13,8 @@ from .produto_use_cases import (
     ListProdutosByCategoriaUseCase,
     UpdateProdutoUseCase,
     DeleteProdutoUseCase,
-    SearchProdutosByNomeUseCase
+    SearchProdutosByNomeUseCase,
+    AjustarEstoqueUseCase,
 )
 
 __all__ = [
@@ -29,4 +30,5 @@ __all__ = [
     "UpdateProdutoUseCase",
     "DeleteProdutoUseCase",
     "SearchProdutosByNomeUseCase",
+    "AjustarEstoqueUseCase",
 ]

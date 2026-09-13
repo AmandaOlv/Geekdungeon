@@ -22,15 +22,22 @@ from src.application.use_cases import (
     ListProdutosByCategoriaUseCase,
     UpdateProdutoUseCase,
     DeleteProdutoUseCase,
-    SearchProdutosByNomeUseCase
+    SearchProdutosByNomeUseCase,
+    AjustarEstoqueUseCase,
 )
 
 
 # Dependency para obter sessão do banco
 def get_db_session():
     """Obtém sessão do banco de dados"""
-    for session in db_config.get_session():
+    session = db_config.session_maker()
+    try:
         yield session
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 # Factories para repositórios SQL Server
@@ -84,17 +91,26 @@ def get_create_produto_use_case(session: Session) -> CreateProdutoUseCase:
 
 def get_get_produto_use_case(session: Session) -> GetProdutoUseCase:
     """Factory para GetProdutoUseCase"""
-    return GetProdutoUseCase(get_produto_repository(session))
+    return GetProdutoUseCase(
+        get_produto_repository(session),
+        get_categoria_repository(session),
+    )
 
 
 def get_list_produtos_use_case(session: Session) -> ListProdutosUseCase:
     """Factory para ListProdutosUseCase"""
-    return ListProdutosUseCase(get_produto_repository(session))
+    return ListProdutosUseCase(
+        get_produto_repository(session),
+        get_categoria_repository(session),
+    )
 
 
 def get_list_produtos_by_categoria_use_case(session: Session) -> ListProdutosByCategoriaUseCase:
     """Factory para ListProdutosByCategoriaUseCase"""
-    return ListProdutosByCategoriaUseCase(get_produto_repository(session))
+    return ListProdutosByCategoriaUseCase(
+        get_produto_repository(session),
+        get_categoria_repository(session),
+    )
 
 
 def get_update_produto_use_case(session: Session) -> UpdateProdutoUseCase:
@@ -112,5 +128,16 @@ def get_delete_produto_use_case(session: Session) -> DeleteProdutoUseCase:
 
 def get_search_produtos_by_nome_use_case(session: Session) -> SearchProdutosByNomeUseCase:
     """Factory para SearchProdutosByNomeUseCase"""
-    return SearchProdutosByNomeUseCase(get_produto_repository(session))
+    return SearchProdutosByNomeUseCase(
+        get_produto_repository(session),
+        get_categoria_repository(session),
+    )
+
+
+def get_ajustar_estoque_use_case(session: Session) -> AjustarEstoqueUseCase:
+    """Factory para AjustarEstoqueUseCase"""
+    return AjustarEstoqueUseCase(
+        get_produto_repository(session),
+        get_categoria_repository(session),
+    )
 

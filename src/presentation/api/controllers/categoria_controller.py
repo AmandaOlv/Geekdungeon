@@ -118,7 +118,8 @@ def delete_categoria(
         use_case = get_delete_categoria_use_case(session)
         use_case.execute(categoria_id)
     except ValueError as e:
+        message = str(e)
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
+            status_code=status.HTTP_404_NOT_FOUND if "não encontrada" in message else status.HTTP_400_BAD_REQUEST,
+            detail=message,
         )

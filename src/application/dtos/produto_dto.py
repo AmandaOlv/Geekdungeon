@@ -41,9 +41,10 @@ class ProdutoDTO:
     data_exclusao: Optional[datetime]
     esta_ativo: bool
     tem_estoque: bool
+    categoria_nome: Optional[str] = None
 
     @classmethod
-    def from_entity(cls, produto):
+    def from_entity(cls, produto, categoria_nome: Optional[str] = None):
         """Converte entidade Produto para DTO"""
         return cls(
             id=produto.id,
@@ -56,8 +57,15 @@ class ProdutoDTO:
             data_atualizacao=produto.data_atualizacao,
             data_exclusao=produto.data_exclusao,
             esta_ativo=produto.esta_ativo,
-            tem_estoque=produto.tem_estoque
+            tem_estoque=produto.tem_estoque,
+            categoria_nome=categoria_nome,
         )
+
+
+@dataclass
+class AjusteEstoqueDTO:
+    """DTO para entrada/saída de estoque"""
+    delta: int
 
 
 @dataclass

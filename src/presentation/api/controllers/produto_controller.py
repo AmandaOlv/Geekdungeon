@@ -12,9 +12,10 @@ from src.application.use_cases import (
     ListProdutosByCategoriaUseCase,
     UpdateProdutoUseCase,
     DeleteProdutoUseCase,
-    SearchProdutosByNomeUseCase
+    SearchProdutosByNomeUseCase,
+    AjustarEstoqueUseCase,
 )
-from src.application.dtos import CreateProdutoDTO, UpdateProdutoDTO, ProdutoDTO
+from src.application.dtos import CreateProdutoDTO, UpdateProdutoDTO, ProdutoDTO, AjusteEstoqueDTO
 from src.presentation.dependencies import (
     get_db_session,
     get_create_produto_use_case,
@@ -23,7 +24,8 @@ from src.presentation.dependencies import (
     get_list_produtos_by_categoria_use_case,
     get_update_produto_use_case,
     get_delete_produto_use_case,
-    get_search_produtos_by_nome_use_case
+    get_search_produtos_by_nome_use_case,
+    get_ajustar_estoque_use_case,
 )
 
 
@@ -85,12 +87,13 @@ def list_produtos(
     session: Session = Depends(get_db_session)
 ) -> List[ProdutoDTO]:
     """Lista produtos com filtros opcionais"""
-    # Busca por nome tem prioridade
     if nome:
         use_case = get_search_produtos_by_nome_use_case(session)
-        return use_case.execute(nome)
-    
-    # Filtro por categoria
+        produtos = use_case.execute(nome)
+        if categoria_id:
+            produtos = [item for item in produtos if item.categoria_id == categoria_id]
+        return produtos
+
     if categoria_id:
         use_case = get_list_produtos_by_categoria_use_case(session)
         return use_case.execute(categoria_id, include_deleted)
@@ -98,6 +101,27 @@ def list_produtos(
     # Lista todos
     use_case = get_list_produtos_use_case(session)
     return use_case.execute(include_deleted)
+
+
+@router.post(
+    "/{produto_id}/estoque",
+    response_model=ProdutoDTO,
+    summary="Ajustar estoque (entrada/saída)",
+)
+def ajustar_estoque(
+    produto_id: int,
+    dto: AjusteEstoqueDTO,
+    session: Session = Depends(get_db_session),
+) -> ProdutoDTO:
+    """Soma (delta positivo) ou baixa (delta negativo) o estoque"""
+    try:
+        use_case = get_ajustar_estoque_use_case(session)
+        return use_case.execute(produto_id, dto)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND if "não encontrado" in str(e) else status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
 
 
 @router.put(
