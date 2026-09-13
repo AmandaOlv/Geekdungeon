@@ -20,6 +20,8 @@ Olá! O que você deseja fazer?
 9️⃣  Criar novo produto
 🔟  Atualizar produto
 1️⃣1️⃣  Deletar produto
+1️⃣2️⃣  Ajustar estoque
+1️⃣3️⃣  Listar produtos por categoria
 
 ─────────────────────
 Digite o *número* da opção desejada.
@@ -51,7 +53,8 @@ function formatProduto(p) {
     (p.descricao ? `Descrição: ${p.descricao}\n` : '') +
     `Preço: ${preco}\n` +
     `Estoque: ${estoque}\n` +
-    `Categoria ID: ${p.categoria_id}\n` +
+    `Categoria ID: ${p.categoria_id}` +
+    (p.categoria_nome ? ` (${p.categoria_nome})` : '') + `\n` +
     `Status: ${status}\n` +
     `Criado em: ${criado}`
   );
@@ -65,8 +68,26 @@ function formatProdutoLinha(p) {
 
 function errMsg(err) {
   const detail = err.response?.data?.detail;
-  if (detail) return `❌ Erro: ${detail}`;
+  if (typeof detail === 'string') return `❌ Erro: ${detail}`;
+  if (Array.isArray(detail)) {
+    return `❌ Erro: ${detail.map((item) => item.msg || JSON.stringify(item)).join('; ')}`;
+  }
   return `❌ Erro ao conectar com a API. Tente novamente.`;
+}
+
+const LIST_LIMIT = 40;
+
+function formatLista(linhas) {
+  if (linhas.length <= LIST_LIMIT) return linhas.join('\n');
+  return `${linhas.slice(0, LIST_LIMIT).join('\n')}\n… e mais ${linhas.length - LIST_LIMIT}. Use busca por nome ou ID.`;
+}
+
+async function textoCategorias() {
+  const cats = await crud.listCategorias();
+  if (!cats.length) {
+    return { ok: false, text: '📦 Nenhuma categoria cadastrada.\nCrie uma categoria primeiro (opção 3).' };
+  }
+  return { ok: true, cats, text: formatLista(cats.map(formatCategoriaLinha)) };
 }
 
 // ── Handler principal ─────────────────────────────────────────────────────────
@@ -155,6 +176,15 @@ async function processMessage(phone, text) {
     case 'PROD_DELETAR_ID':
       return await handleProdDeletarId(phone, input);
 
+    case 'PROD_ESTOQUE_ID':
+      return await handleProdEstoqueId(phone, input);
+
+    case 'PROD_ESTOQUE_DELTA':
+      return await handleProdEstoqueDelta(phone, input);
+
+    case 'PROD_LISTAR_CAT':
+      return await handleProdListarCat(phone, input);
+
     default:
       resetSession(phone);
       return MAIN_MENU;
@@ -173,7 +203,7 @@ async function handleMenuChoice(phone, input) {
           resetSession(phone);
           return '📦 Nenhuma categoria cadastrada.\n\nEnvie *menu* para voltar.';
         }
-        const linhas = cats.map(formatCategoriaLinha).join('\n');
+        const linhas = formatLista(cats.map(formatCategoriaLinha));
         resetSession(phone);
         return `📦 *Categorias* (${cats.length} encontrada${cats.length > 1 ? 's' : ''})\n\n${linhas}\n\nEnvie *menu* para voltar.`;
       } catch (err) {
@@ -210,7 +240,7 @@ async function handleMenuChoice(phone, input) {
           resetSession(phone);
           return '🛍️ Nenhum produto cadastrado.\n\nEnvie *menu* para voltar.';
         }
-        const linhas = prods.map(formatProdutoLinha).join('\n');
+        const linhas = formatLista(prods.map(formatProdutoLinha));
         resetSession(phone);
         return `🛍️ *Produtos* (${prods.length} encontrado${prods.length > 1 ? 's' : ''})\n\n${linhas}\n\nEnvie *menu* para voltar.`;
       } catch (err) {
@@ -230,9 +260,20 @@ async function handleMenuChoice(phone, input) {
       return '🛍️ *Buscar por Nome*\nDigite o *nome* (ou parte do nome) do produto:';
 
     // ── 9. Criar produto
-    case '9':
-      setState(phone, 'PROD_CRIAR_NOME');
-      return '🛍️ *Novo Produto* (1/5)\nDigite o *nome* do produto:';
+    case '9': {
+      try {
+        const listed = await textoCategorias();
+        if (!listed.ok) {
+          resetSession(phone);
+          return `${listed.text}\n\nEnvie *menu* para voltar.`;
+        }
+        setState(phone, 'PROD_CRIAR_NOME', { categoriasHint: listed.text });
+        return '🛍️ *Novo Produto* (1/5)\nDigite o *nome* do produto:';
+      } catch (err) {
+        resetSession(phone);
+        return errMsg(err);
+      }
+    }
 
     // ── 10. Atualizar produto
     case '10':
@@ -244,8 +285,27 @@ async function handleMenuChoice(phone, input) {
       setState(phone, 'PROD_DELETAR_ID');
       return '🛍️ *Deletar Produto*\nDigite o *ID* do produto que deseja deletar:';
 
+    case '12':
+      setState(phone, 'PROD_ESTOQUE_ID');
+      return '📦 *Ajustar Estoque*\nDigite o *ID* do produto:';
+
+    case '13': {
+      try {
+        const listed = await textoCategorias();
+        if (!listed.ok) {
+          resetSession(phone);
+          return `${listed.text}\n\nEnvie *menu* para voltar.`;
+        }
+        setState(phone, 'PROD_LISTAR_CAT');
+        return `🛍️ *Produtos por categoria*\nDigite o *ID* da categoria:\n\n${listed.text}`;
+      } catch (err) {
+        resetSession(phone);
+        return errMsg(err);
+      }
+    }
+
     default:
-      return `❓ Opção inválida. Escolha um número entre 1 e 11.\n\nEnvie *menu* para ver as opções.`;
+      return `❓ Opção inválida. Escolha um número entre 1 e 13.\n\nEnvie *menu* para ver as opções.`;
   }
 }
 
@@ -271,8 +331,7 @@ async function handleCatCriarNome(phone, input) {
     resetSession(phone);
     return `✅ *Categoria criada com sucesso!*\n\n${formatCategoria(cat)}\n\nEnvie *menu* para voltar.`;
   } catch (err) {
-    resetSession(phone);
-    return errMsg(err);
+    return `${errMsg(err)}\n\nDigite outro nome, ou *menu* para cancelar.`;
   }
 }
 
@@ -338,7 +397,7 @@ async function handleProdBuscarNome(phone, input) {
       resetSession(phone);
       return `🛍️ Nenhum produto encontrado com "${input}".\n\nEnvie *menu* para voltar.`;
     }
-    const linhas = prods.map(formatProdutoLinha).join('\n');
+    const linhas = formatLista(prods.map(formatProdutoLinha));
     resetSession(phone);
     return `🛍️ *Resultado para "${input}"* (${prods.length})\n\n${linhas}\n\nEnvie *menu* para voltar.`;
   } catch (err) {
@@ -371,8 +430,17 @@ async function handleProdCriarPreco(phone, input) {
 async function handleProdCriarEstoque(phone, input) {
   const estoque = parseInt(input, 10);
   if (isNaN(estoque) || estoque < 0) return '⚠️ Quantidade inválida. Digite um número inteiro >= 0:';
+  const session = getSession(phone);
+  let catsText = session.data.categoriasHint;
+  if (!catsText) {
+    try {
+      catsText = (await textoCategorias()).text;
+    } catch (err) {
+      catsText = '(Não foi possível listar as categorias agora)';
+    }
+  }
   setState(phone, 'PROD_CRIAR_CATEGORIA', { quantidade_estoque: estoque });
-  return '🛍️ *Novo Produto* (5/5)\nDigite o *ID da categoria* do produto:';
+  return `🛍️ *Novo Produto* (5/5)\nDigite o *ID da categoria*:\n\n${catsText}`;
 }
 
 async function handleProdCriarCategoria(phone, input) {
@@ -390,8 +458,7 @@ async function handleProdCriarCategoria(phone, input) {
     resetSession(phone);
     return `✅ *Produto criado com sucesso!*\n\n${formatProduto(prod)}\n\nEnvie *menu* para voltar.`;
   } catch (err) {
-    resetSession(phone);
-    return errMsg(err);
+    return `${errMsg(err)}\n\nDigite outro *ID de categoria*, ou *menu* para cancelar.`;
   }
 }
 
@@ -462,7 +529,14 @@ async function handleProdAtualizarEstoque(phone, input) {
   }
   setState(phone, 'PROD_ATUALIZAR_CATEGORIA', { updates });
   const catAtual = session.data.atual?.categoria_id;
-  return `🛍️ *Atualizar* (5/5) — Categoria ID atual: *${catAtual}*\nNovo ID de categoria _(ou *-* para manter)_:`;
+  const catNome = session.data.atual?.categoria_nome;
+  let catsText = '';
+  try {
+    catsText = `\n\n${(await textoCategorias()).text}`;
+  } catch {
+    catsText = '';
+  }
+  return `🛍️ *Atualizar* (5/5) — Categoria atual: *${catAtual}${catNome ? ` (${catNome})` : ''}*\nNovo ID de categoria _(ou *-* para manter)_:${catsText}`;
 }
 
 async function handleProdAtualizarCategoria(phone, input) {
@@ -483,8 +557,7 @@ async function handleProdAtualizarCategoria(phone, input) {
     resetSession(phone);
     return `✅ *Produto atualizado com sucesso!*\n\n${formatProduto(prod)}\n\nEnvie *menu* para voltar.`;
   } catch (err) {
-    resetSession(phone);
-    return errMsg(err);
+    return `${errMsg(err)}\n\nDigite outro ID de categoria, *-* para manter, ou *menu* para cancelar.`;
   }
 }
 
@@ -495,6 +568,57 @@ async function handleProdDeletarId(phone, input) {
     await crud.deleteProduto(id);
     resetSession(phone);
     return `✅ Produto #${id} deletado com sucesso!\n\nEnvie *menu* para voltar.`;
+  } catch (err) {
+    resetSession(phone);
+    return errMsg(err);
+  }
+}
+
+async function handleProdEstoqueId(phone, input) {
+  const id = parseInt(input, 10);
+  if (isNaN(id) || id <= 0) return '⚠️ ID inválido. Digite apenas o número:';
+  try {
+    const prod = await crud.getProdutoById(id);
+    setState(phone, 'PROD_ESTOQUE_DELTA', { id: prod.id, atual: prod });
+    return (
+      `${formatProduto(prod)}\n\n` +
+      `📦 Estoque atual: *${prod.quantidade_estoque}*\n` +
+      `Digite a quantidade com sinal, por exemplo *+5* (entrada) ou *-2* (saída):`
+    );
+  } catch (err) {
+    resetSession(phone);
+    return errMsg(err);
+  }
+}
+
+async function handleProdEstoqueDelta(phone, input) {
+  const cleaned = String(input).trim().replace(/\s/g, '').replace(',', '.');
+  if (!/^[+-]?\d+$/.test(cleaned)) {
+    return '⚠️ Use um número inteiro com sinal, por exemplo *+5* ou *-2*:';
+  }
+  const delta = parseInt(cleaned, 10);
+  if (!delta) return '⚠️ Informe uma quantidade diferente de zero:';
+  const { id } = getSession(phone).data;
+  try {
+    const prod = await crud.ajustarEstoque(id, delta);
+    resetSession(phone);
+    return `✅ *Estoque atualizado!*\n\n${formatProduto(prod)}\n\nEnvie *menu* para voltar.`;
+  } catch (err) {
+    return `${errMsg(err)}\n\nDigite outra quantidade, ou *menu* para cancelar.`;
+  }
+}
+
+async function handleProdListarCat(phone, input) {
+  const id = parseInt(input, 10);
+  if (isNaN(id) || id <= 0) return '⚠️ ID inválido. Digite apenas o número da categoria:';
+  try {
+    const prods = await crud.listProdutos({ categoria_id: id });
+    resetSession(phone);
+    if (!prods.length) {
+      return `🛍️ Nenhum produto ativo na categoria #${id}.\n\nEnvie *menu* para voltar.`;
+    }
+    const linhas = formatLista(prods.map(formatProdutoLinha));
+    return `🛍️ *Produtos da categoria #${id}* (${prods.length})\n\n${linhas}\n\nEnvie *menu* para voltar.`;
   } catch (err) {
     resetSession(phone);
     return errMsg(err);

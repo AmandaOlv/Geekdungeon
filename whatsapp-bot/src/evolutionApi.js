@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { EVOLUTION_API_URL, EVOLUTION_API_KEY, INSTANCE_NAME, WEBHOOK_URL } = require('./config');
+const { isAllowedPhone } = require('./allowlist');
 
 const api = axios.create({
   baseURL: EVOLUTION_API_URL,
@@ -91,6 +92,10 @@ async function setWebhook() {
  * @param {string} text    Texto a enviar (suporta markdown do WhatsApp: *negrito*, _itálico_)
  */
 async function sendText(number, text) {
+  if (!isAllowedPhone(number)) {
+    console.log(`🚫 Bloqueado envio para número não autorizado: ${number}`);
+    return;
+  }
   await api.post(`/message/sendText/${INSTANCE_NAME}`, {
     number,
     text,

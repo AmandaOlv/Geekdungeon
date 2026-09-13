@@ -3,13 +3,13 @@ Infrastructure Layer - SQL Server Categoria Repository
 Implementação do repositório usando SQL Server
 """
 from typing import Optional, List
-from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime
 
 from src.domain.entities import Categoria
 from src.domain.repositories import ICategoriaRepository
-from src.infrastructure.database import CategoriaModel, db_config
+from src.infrastructure.database import CategoriaModel
 
 
 class SqlServerCategoriaRepository(ICategoriaRepository):
@@ -68,7 +68,7 @@ class SqlServerCategoriaRepository(ICategoriaRepository):
         if not include_deleted:
             query = query.filter(CategoriaModel.DataExclusao.is_(None))
         
-        models = query.all()
+        models = query.order_by(CategoriaModel.Id).all()
         
         return [self._to_entity(model) for model in models]
     
@@ -92,7 +92,8 @@ class SqlServerCategoriaRepository(ICategoriaRepository):
     def delete(self, categoria_id: int) -> bool:
         """Soft delete de uma categoria"""
         model = self._session.query(CategoriaModel).filter(
-            CategoriaModel.Id == categoria_id
+            CategoriaModel.Id == categoria_id,
+            CategoriaModel.DataExclusao.is_(None),
         ).first()
         
         if not model:
@@ -104,9 +105,9 @@ class SqlServerCategoriaRepository(ICategoriaRepository):
         return True
     
     def find_by_nome(self, nome: str) -> Optional[Categoria]:
-        """Busca categoria por nome"""
+        """Busca categoria ativa por nome (sem diferenciar maiúsculas)"""
         model = self._session.query(CategoriaModel).filter(
-            CategoriaModel.Nome == nome,
+            func.lower(CategoriaModel.Nome) == nome.strip().lower(),
             CategoriaModel.DataExclusao.is_(None)
         ).first()
         
