@@ -417,13 +417,20 @@ A camada de infraestrutura contém os **detalhes técnicos**: como conectar ao b
 ```python
 class DatabaseConfig:
     def __init__(self):
+        # Credenciais vêm do .env — nunca hardcode no código ou no README
+        server = os.getenv("DB_SERVER")
+        database = os.getenv("DB_NAME")
+        user = os.getenv("DB_USER")
+        password = os.getenv("DB_PASSWORD")
+        driver = os.getenv("DB_DRIVER", "ODBC Driver 18 for SQL Server")
+
         connection_string = (
-            "DRIVER={ODBC Driver 18 for SQL Server};"       # Driver ODBC instalado
-            "SERVER=[REDACTED_HOST];"   # Endereço do servidor
-            "DATABASE=geekdungeon-produtos;"                 # Nome do banco
-            "UID=[REDACTED_USER];"                      # Usuário
-            "PWD=[REDACTED];"                                # Senha
-            "TrustServerCertificate=yes;"                    # Aceitar certificado SSL
+            f"DRIVER={{{driver}}};"
+            f"SERVER={server};"
+            f"DATABASE={database};"
+            f"UID={user};"
+            f"PWD={password};"
+            "TrustServerCertificate=yes;"
         )
 
         # Converte a connection string para URL do SQLAlchemy
@@ -438,6 +445,8 @@ class DatabaseConfig:
             pool_recycle=3600,   # Recicla conexões a cada 1 hora
         )
 ```
+
+> ⚠️ Preencha `DB_SERVER`, `DB_NAME`, `DB_USER` e `DB_PASSWORD` no arquivo `.env` (copie de `.env.example`). **Nunca** publique senhas no Git.
 
 > 💡 **O que é uma Engine?** É o objeto principal do SQLAlchemy que gerencia a conexão com o banco. Pense nela como um "gerente de conexões".
 

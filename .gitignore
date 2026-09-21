@@ -44,6 +44,8 @@ web/dist/
 firebase-debug.log
 *-debug.log
 
-# WhatsApp session
+# WhatsApp session (raiz e subpastas)
 .wwebjs_auth/
 .wwebjs_cache/
+**/.wwebjs_auth/
+**/.wwebjs_cache/
